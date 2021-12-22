@@ -66,7 +66,7 @@ function is_multipass_installed(){
         echo 'multipass is installed.'
     else
         echo 'multipass is not installed.'
-        echo 'Script is installing multipass.'
+        echo 'Script is installing multipass. It may require your password.'
         install_multipass
     fi
 
@@ -74,6 +74,30 @@ function is_multipass_installed(){
 
 function install_multipass(){
     brew install --cask multipass
+    MULTIPASS_STARTING_STR="Multipass is starting... "
+    SPINNER_INTERVAL=0.1
+    while [[ ! -S /var/run/multipass_socket ]]
+    do
+        echo -ne "${MULTIPASS_STARTING_STR}/\r"
+        sleep ${SPINNER_INTERVAL}
+        echo -ne "${MULTIPASS_STARTING_STR}-\r"
+        sleep ${SPINNER_INTERVAL}
+        echo -ne "${MULTIPASS_STARTING_STR}\\ \r"
+        sleep ${SPINNER_INTERVAL}
+        echo -ne "${MULTIPASS_STARTING_STR}|\r"
+        sleep ${SPINNER_INTERVAL}
+        echo -ne "${MULTIPASS_STARTING_STR}/\r"
+        sleep ${SPINNER_INTERVAL}
+        echo -ne "${MULTIPASS_STARTING_STR}-\r"
+        sleep ${SPINNER_INTERVAL}
+        echo -ne "${MULTIPASS_STARTING_STR}\\ \r"
+        sleep ${SPINNER_INTERVAL}
+        echo -ne "${MULTIPASS_STARTING_STR}|\r"
+        sleep ${SPINNER_INTERVAL}
+    done
+    echo "${MULTIPASS_STARTING_STR}"
+    echo "Multipass is UP!"
+        
 }
 
 # create an ubuntu1604 VM
@@ -143,13 +167,17 @@ function cleanup(){
     multipass delete $VM_NAME
     multipass purge
     rm -rf ${TMP_DIR}
+    brew uninstall multipass
 }
 
 function wrapup(){
     VM_IP=`multipass exec ubuntu1604 -- hostname -I`
 #    KEY_PATH=`echo ${SECRETS_DIR)"/"${KEY_NAME}`
-    echo "To run ssh to the Virtual Machine, please run the commnad below:"
+    echo "To run ssh to the Virtual Machine, please run the command below:"
     echo "ssh -o \"UserKnownHostsFile=/dev/null\" -o \"StrictHostKeyChecking=no\" -i ${SECRETS_DIR}/${KEY_NAME} -l ${VM_USERNAME} ${VM_IP}"
+
+    echo "To verify opened port, please run the command below:"
+    echo "nmap ${VM_IP} -Pn"
     
 }
 

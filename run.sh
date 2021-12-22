@@ -1,23 +1,27 @@
 #!/bin/bash
 
 # Setup working directories
-
 TMP_DIR=${HOME}/.chef_ubuntu_1604
 SECRETS_DIR=${TMP_DIR}/.secrets
 COOKBOOK_DIR=${TMP_DIR}/cookbooks
+
+# Setup default parameters
 DEFAULT_VM_NAME="ubuntu1604"
 VM_NAME=${DEFAULT_VM_NAME}
 UBUNTU_VERSION='16.04'
 KEY_NAME="id_ed25519_${VM_NAME}"
 VM_USERNAME="ubuntu"
+
+# Setup external resource
 CHEF_DEB_URL="https://packages.chef.io/files/stable/chef-workstation/21.10.640/ubuntu/16.04/chef-workstation_21.10.640-1_amd64.deb"
 CHEF_DEB_FILENAME="chef-workstation_21.10.640-1_amd64.deb"
 
-
+# Print directory for tracing back purpose
 function print_working_folders() {
    echo $TMP_DIR
    echo $SECRETS_DIR
 }
+
 # check folders exist
 function create_working_folder_if_not_exist(){
 
@@ -49,14 +53,15 @@ function create_ssh_key_pair(){
     ssh-keygen -o -a 100 -t ed25519 -f ${SECRETS_DIR}/${KEY_NAME} -N "" -C "ubuntu@${VM_NAME}" -q 
 }
 
+# prepare ssh script for installation
 function copy_ssh_scripts(){
     cp -p copy_ssh_keys.sh ${TMP_DIR}/.
 }
 
+# install a fresh ssh key to the vm
 function authorise_public_key(){
     multipass exec $1 -- bash ${TMP_DIR}/copy_ssh_keys.sh --public_key ${SECRETS_DIR}/${KEY_NAME}.pub 
 }
-
 
 # verify multipass
 function is_multipass_installed(){
@@ -69,9 +74,9 @@ function is_multipass_installed(){
         echo 'Script is installing multipass. It may require your password.'
         install_multipass
     fi
-
 }
 
+# install multipass into the VM
 function install_multipass(){
     brew install --cask multipass
     MULTIPASS_STARTING_STR="Multipass is starting... "
@@ -105,7 +110,6 @@ function create_virtual_machine(){
     echo 'Creating VM with multipass.'
     multipass launch --name $1 $2
     multipass mount ${TMP_DIR} $1
-
 }
 
 #preflight check
@@ -115,13 +119,11 @@ function setenv(){
     create_ssh_key_pair
     copy_ssh_scripts
     is_multipass_installed
-
 }
 
 
 #apt update and ugprade
 function apt_update_and_upgrade(){
-
     multipass exec $1 -- sudo apt update
     multipass exec $1 -- sudo apt upgrade -y
 }
@@ -130,8 +132,6 @@ function apt_update_and_upgrade(){
 function install_chef(){
     cp install_chef.sh ${TMP_DIR}/.
     multipass exec $1 -- sudo bash ${TMP_DIR}/install_chef.sh --deb_url $CHEF_DEB_URL --localpath ${TMP_DIR} --filename ${CHEF_DEB_FILENAME}
-    #multipass exec $1 -- cd ${TMP} && sudo dpkg -i ${CHEF_DEB_FILENAME}
-#    multipass exec $1 -- sudo dpkg -i ${TMP_DIR}/${CHEF_DEB_FILENAME}
 }
 
 
@@ -141,17 +141,20 @@ function setup_chef_resources(){
     cp -p execute_chef_runlist.sh ${TMP_DIR}/.
 }
 
+# download chef cookbooks from a self managed git repo
 function git_clone_recipe(){
     multipass exec $1 -- git clone https://github.com/wkchan/motd.git ${COOKBOOK_DIR}/motd
     multipass exec $1 -- git clone https://github.com/wkchan/ufw.git ${COOKBOOK_DIR}/ufw
     multipass exec $1 -- git clone https://github.com/wkchan/firewall.git ${COOKBOOK_DIR}/firewall
 }
 
+# Tiny up the environment and execute the provisioning script
 function run_chef_runlist(){
     multipass exec $1 -- sudo find /etc/update-motd.d/ -type f -delete
     multipass exec $1 -- sudo bash ${TMP_DIR}/execute_chef_runlist.sh --chefhome ${TMP_DIR} --nodejson node.json
 }
 
+# Main method of this script
 function main(){
     create_virtual_machine $VM_NAME $UBUNTU_VERSION
     apt_update_and_upgrade $VM_NAME
@@ -162,23 +165,22 @@ function main(){
     authorise_public_key $VM_NAME
 }
 
+# Prepare the environment for the installation
 function cleanup(){
     multipass stop $VM_NAME
     multipass delete $VM_NAME
     multipass purge
     rm -rf ${TMP_DIR}
-    brew uninstall multipass
 }
 
+# Print the information needed for the test later
 function wrapup(){
     VM_IP=`multipass exec ubuntu1604 -- hostname -I`
-#    KEY_PATH=`echo ${SECRETS_DIR)"/"${KEY_NAME}`
     echo "To run ssh to the Virtual Machine, please run the command below:"
     echo "ssh -o \"UserKnownHostsFile=/dev/null\" -o \"StrictHostKeyChecking=no\" -i ${SECRETS_DIR}/${KEY_NAME} -l ${VM_USERNAME} ${VM_IP}"
 
     echo "To verify opened port, please run the command below:"
     echo "nmap ${VM_IP} -Pn"
-    
 }
 
 cleanup

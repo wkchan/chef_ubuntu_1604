@@ -1,0 +1,8 @@
+{
+    "name": "ubuntu1604",
+    "chef_environment": "_default",
+    "run_list": [
+      "recipe[ufw::default]",
+      "recipe[motd::assurity]"
+    ]
+}
